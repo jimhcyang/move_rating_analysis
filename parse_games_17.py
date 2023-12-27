@@ -2,7 +2,7 @@ import chess.pgn
 from tqdm import tqdm
 
 date = '2017-05'
-output_name = 'asset/analyzed_games_{}.pgn'.format(date)
+output_name = 'test_assets/game_52_.pgn'.format(date)
 pgn_file_path = 'asset/lichess_db_standard_rated_{}.pgn'.format(date)
 
 def extract_time_control(tag):
@@ -36,9 +36,9 @@ def read_pgn_file(file_path, max_games=1000, output_file=output_name):
 
     return total_games_seen, games_with_eval_seen, games_with_eval
 
-total_games_seen, games_with_eval_seen, _ = read_pgn_file(pgn_file_path, max_games=10000000)
+total_games_seen, games_with_eval_seen, _ = read_pgn_file(pgn_file_path)
 
 # Print the statistics
 print(f"Total games seen: {total_games_seen}")
 print(f"Games with eval seen: {games_with_eval_seen}")
-print(f"Analyzed games saved to 'analyzed_games.pgn'")
+print(f"Analyzed games saved to {output_name}")
