@@ -30,7 +30,9 @@ def count_games(file_path, num_games=1000, start_index=0, encoding="utf-8"):
 
 assets_path = os.path.join(os.getcwd(), 'asset')
 #NUM_GAMES = 1000
-NUM_GAMES = None
+NUM_GAMES = [15000,10000,10000,15000]
+#NUM_GAMES = None
+'''
 while NUM_GAMES is None:
     try:
         n_games = input('Please Enter Number of Games: ')
@@ -41,14 +43,23 @@ while NUM_GAMES is None:
         print('Invalid Number! Please Enter Integer.')
         print('Press Enter to Quit.')
         NUM_GAMES = None
-
-file_name = '2023_{}_games.pgn'.format(NUM_GAMES)
+'''
+file_name = '2023_tc_{}_games.pgn'.format(sum(NUM_GAMES))
 
 for i in range(10):
     sample_size = NUM_GAMES
-    out_path = os.path.join(assets_path, 'rating_split_7_rand')
-    file_path = os.path.join(out_path, 'group_{}.pgn'.format(i))
-    sample_games(file_path, file_name, sample_size)
+    #out_path = os.path.join(assets_path, 'rating_split_7_rand')
+    out_path = os.path.join(assets_path, 'split_by_tc')
+    #file_path = os.path.join(out_path, 'group_{}.pgn'.format(i))
+    file_path_180_0 = os.path.join(out_path, 'group_{}_180_0.pgn'.format(i))
+    file_path_180_2 = os.path.join(out_path, 'group_{}_180_2.pgn'.format(i))
+    file_path_300_0 = os.path.join(out_path, 'group_{}_300_0.pgn'.format(i))
+    file_path_600_0 = os.path.join(out_path, 'group_{}_600_0.pgn'.format(i))
+    sample_games(file_path_180_0, file_name, sample_size[0])
+    sample_games(file_path_180_2, file_name, sample_size[1])
+    sample_games(file_path_300_0, file_name, sample_size[2])
+    sample_games(file_path_600_0, file_name, sample_size[3])
 
 final_out_path = os.path.join(assets_path, file_name)
-print(file_name, count_games(final_out_path, 10*NUM_GAMES))
+#print(file_name, count_games(final_out_path, 10*NUM_GAMES))
+print(file_name, count_games(final_out_path, 10*sum(NUM_GAMES)))

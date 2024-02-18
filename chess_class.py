@@ -2,6 +2,7 @@ import chess
 import chess.pgn
 import numpy as np
 import pandas as pd
+import pickle
 from collections import Counter
 from tqdm import tqdm
 
@@ -21,7 +22,7 @@ class ChessGame:
         self.time_control = self.time_control_to_list(game.headers['TimeControl'])
         self.clock_situation = [self.time_control[0]]*2
         self.total_ply = len(list(game.mainline_moves()))
-        self.game_state = 1
+        self.game_state = 0.6
         self.pos_eval = 30
         node = self.chessdotGame
         
@@ -69,7 +70,7 @@ class ChessGame:
         if self.time_control[1] > 0:
             fast_move += self.time_control[1]
             slow_move += self.time_control[1]
-        if move_time == 0:
+        if move_time <= 1:
             return 'instant'
         elif move_time <= fast_move:
             return 'fast'
@@ -194,6 +195,35 @@ class ChessMove:
     def get_square_attackers(self, board, square, color):
         return {sq: board.piece_at(sq).piece_type for sq in board.attackers(color, square)}
 
+    def get_complete_influencers(self, influencers, target, board, color):
+
+        def get_battery_influencers(square, target_square):
+            ray = chess.SquareSet.ray(square, target_square)
+            return ray
+            
+        complete_influencers = influencers.copy()
+        
+        for square in influencers:
+            allies = []
+            strip = get_battery_influencers(square, target)
+            if len(strip) != 0:
+                if chess.square_rank(target) == chess.square_rank(square) or chess.square_file(target) == chess.square_file(square):
+                    allies = [chess.piece_symbol(chess.ROOK), chess.piece_symbol(chess.QUEEN)]
+                else:
+                    allies = [chess.piece_symbol(chess.BISHOP), chess.piece_symbol(chess.QUEEN)]
+            else:
+                continue
+            backups = [s for s in strip if s > square] if square > target else [s for s in strip if s < square]
+            backups = sorted(backups, key=lambda s: chess.square_distance(square, s))
+            for sq in backups:
+                if board.piece_at(sq) == None:
+                    continue
+                elif board.piece_at(sq).color != color:
+                    break
+                elif str(board.piece_at(sq)) in allies:
+                    complete_influencers[sq] = board.piece_at(sq).piece_type
+        return complete_influencers
+
     def get_relative_position(self, sq_start, sq_end):
         return (chess.square_rank(sq_start) - chess.square_rank(sq_end)) * (-1)**int(self.color)
     
@@ -207,13 +237,30 @@ class ChessMove:
                 if board.piece_at(sq).color == self.color:
                     continue
                 target_value = board.piece_at(sq).piece_type
-                attack_dict = self.get_square_attackers(board, sq, self.color)
-                defend_dict = self.get_square_attackers(board, sq, not self.color)
-                attackers = sorted([attack_dict[sq] for sq in attack_dict])
-                defenders = sorted([defend_dict[sq] for sq in defend_dict])
-                if attackers[0] < target_value or (attackers[0] == target_value and len(attackers) > len(defenders)) or len(defenders) == 0:
+                attackers = self.get_square_attackers(board, sq, self.color)
+                defenders = self.get_square_attackers(board, sq, not self.color)
+                attacking_pieces = sorted([attackers[sq] for sq in attackers])
+                defending_pieces = sorted([defenders[sq] for sq in defenders])
+
+                all_attack = self.get_complete_influencers(attackers, sq, self.apply_move(), self.color)
+                all_defend = self.get_complete_influencers(defenders, sq, self.apply_move(), not self.color)
+                if set(all_attack) - set(attackers) != set():
+                    for new_sq in set(all_attack) - set(attackers):
+                        attacking_pieces.append(all_attack[new_sq])
+                if set(all_defend) - set(defenders) != set():
+                    for new_sq in set(all_defend) - set(defenders):
+                        defending_pieces.append(all_defend[new_sq])
+                if attacking_pieces[0] < target_value:
                     attacked_squares[sq] = target_value
-                elif len(attackers) > len(defenders) or (attackers[0] < 5 and target_value > 1) or attackers[0] == 1:
+                elif len(defending_pieces) == 0:
+                    attacked_squares[sq] = target_value
+                elif len(attacking_pieces) > len(defending_pieces):
+                    for i, d in enumerate(defending_pieces):
+                        if  d < attacking_pieces[i+1]:
+                            tension_squares[sq] = target_value
+                            break
+                    attacked_squares[sq] = target_value
+                elif len(attacking_pieces) > len(defending_pieces) or (attacking_pieces[0] < 5 and target_value > 1) or attacking_pieces[0] == 1:
                     tension_squares[sq] = target_value
         if toret == 'attack':
             #return sorted(attacked_squares, key=lambda s: attacked_squares[s], reverse=True)
@@ -253,7 +300,10 @@ class ChessMove:
             target_square = target_move.to_square
             cappers = [move for move in board.legal_moves if board.is_capture(move) and move.to_square == target_square]
             cappers_type = sorted([board.piece_at(move.from_square).piece_type for move in cappers])
-            capped = board.piece_at(target_square).piece_type
+            try:
+                capped = board.piece_at(target_square).piece_type
+            except:
+                capped = 1
             test_board = chess.Board(board.fen())
             test_board.push(target_move)
             if cappers_type[0] == 1:
