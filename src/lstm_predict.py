@@ -4,14 +4,11 @@ import chess.pgn
 import numpy as np
 import pandas as pd
 import os
-import pickle
 from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision
-import torchvision.transforms as transforms
-from torch.utils.data import TensorDataset, DataLoader
+
 
 # %%
 FILENAME = None
@@ -157,15 +154,16 @@ game_arrays, ratings_list, urls_list  = chess_games_to_arrays(games_generator)
 
 # %%
 input_size = 42
-hidden_size = 128
+hidden_size = 100
 num_classes = 10
-num_epochs = 12
-num_layers = 2
+num_epochs = 30
+num_layers = 3
 learning_rate = 0.001
 dropout_rate = 0
-sequence_length = len(game_arrays[0])
-batch_size = 1
-alpha = 0.64
+sequence_length = 128
+batch_size = 80
+alpha = 0.875
+decay = 0.0001
 
 # %%
 def pad_game(game, max_length=256, vector_size=42):
@@ -176,7 +174,9 @@ def pad_game(game, max_length=256, vector_size=42):
         padding = np.full((padding_length, vector_size), -1)
         return np.vstack((game, padding))
 
+game_length = len(game_arrays[0])
 padded_game = [pad_game(g, sequence_length)[start::skips] for g in game_arrays]
+#padded_game = [pad_game(g, sequence_length)[start:game_length:skips] for g in game_arrays]
 padded_games = [padded_game[0][:i+1] for i in range(len(padded_game[0]))]
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -219,7 +219,7 @@ class RNN(nn.Module):
 
 # %%
 model_path = '2023_tc_50000_games_pred.pth'
-model = RNN(input_size, hidden_size, num_layers, num_classes).to(device)
+model = RNN(input_size, hidden_size, num_layers, num_classes, dropout_rate).to(device)
 model.load_state_dict(torch.load(model_path, map_location=device))
 model.to(device);
 
@@ -253,7 +253,7 @@ for m, test_data in enumerate(padded_games):
                 cusum += (3200*p - 168)
         else:
             cusum += (700+200*i)*p
-    #print('Predicted Rating: {:.0f}'.format(cusum))
+    print('Move {}: {:.0f}'.format(m//2+1, cusum))
 
 print('Model Prediction: {}'.format(pred[1].item()))
 print('True Class: {}'.format(ratings_list[0]))
